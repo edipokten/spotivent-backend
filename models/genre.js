@@ -8,7 +8,6 @@ module.exports = (sequelize, DataTypes) => {
      * The `models/index` file will call this method automatically.
      */
     static associate(models) {
-      genre.belongsToMany(models.dj, { through: "dj_genre" });
       genre.belongsToMany(models.artist, { through: "artist_genre" });
     }
   }

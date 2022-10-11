@@ -22,6 +22,9 @@ module.exports = {
       eventUrl: {
         type: Sequelize.TEXT,
       },
+      imageUrl: {
+        type: Sequelize.TEXT,
+      },
       city: {
         type: Sequelize.STRING,
       },

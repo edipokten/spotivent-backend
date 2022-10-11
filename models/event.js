@@ -8,7 +8,7 @@ module.exports = (sequelize, DataTypes) => {
      * The `models/index` file will call this method automatically.
      */
     static associate(models) {
-      event.hasMany(models.dj, { foreignKey: "eventId" });
+      event.belongsToMany(models.artist, { through: "event_artist" });
     }
   }
   event.init(
@@ -17,6 +17,7 @@ module.exports = (sequelize, DataTypes) => {
       date: DataTypes.DATE,
       location: DataTypes.STRING,
       eventUrl: DataTypes.TEXT,
+      imageUrl: DataTypes.TEXT,
       city: DataTypes.STRING,
     },
     {

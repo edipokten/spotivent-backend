@@ -13,6 +13,12 @@ module.exports = {
         type: Sequelize.STRING,
         allowNull: false,
       },
+      spotifyToken: {
+        type: Sequelize.TEXT,
+      },
+      spotifyRefreshToken: {
+        type: Sequelize.TEXT,
+      },
       image: {
         type: Sequelize.TEXT,
       },

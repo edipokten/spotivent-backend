@@ -9,7 +9,7 @@ module.exports = (sequelize, DataTypes) => {
      */
     static associate(models) {
       playlist.belongsTo(models.user, { foreignKey: "userId" });
-      playlist.hasMany(models.artist, { foreignKey: "playlistId" });
+      playlist.belongsToMany(models.artist, { through: "playlist_artist" });
     }
   }
   playlist.init(

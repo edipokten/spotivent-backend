@@ -14,6 +14,8 @@ module.exports = (sequelize, DataTypes) => {
   user.init(
     {
       spotifyUserId: { type: DataTypes.STRING, unique: true, allowNull: false },
+      spotifyToken: DataTypes.TEXT,
+      spotifyRefreshToken: DataTypes.TEXT,
       image: DataTypes.TEXT,
       name: { type: DataTypes.STRING, allowNull: false },
     },

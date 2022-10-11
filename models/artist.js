@@ -8,14 +8,18 @@ module.exports = (sequelize, DataTypes) => {
      * The `models/index` file will call this method automatically.
      */
     static associate(models) {
-      artist.belongsTo(models.playlist, { foreignKey: "playlistId" });
       artist.belongsToMany(models.genre, { through: "artist_genre" });
+      artist.belongsToMany(models.event, { through: "event_artist" });
+      artist.belongsToMany(models.playlist, { through: "playlist_artist" });
     }
   }
   artist.init(
     {
-      playlistId: DataTypes.INTEGER,
-      spotifyArtistId: DataTypes.STRING,
+      spotifyArtistId: {
+        type: DataTypes.STRING,
+        unique: true,
+        allowNull: false,
+      },
       name: DataTypes.STRING,
     },
     {

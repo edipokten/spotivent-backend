@@ -9,17 +9,9 @@ module.exports = {
         primaryKey: true,
         type: Sequelize.INTEGER,
       },
-      playlistId: {
-        type: Sequelize.INTEGER,
-        references: {
-          model: "playlists",
-          key: "id",
-        },
-        onUpdate: "CASCADE",
-        onDelete: "SET NULL",
-      },
       spotifyArtistId: {
         type: Sequelize.STRING,
+        unique: true,
       },
       name: {
         type: Sequelize.STRING,
