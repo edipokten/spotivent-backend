@@ -1,6 +1,6 @@
 const raEvents = require("./dummyEventData.js");
 const convertAllEvents = require("./trimEvents.js");
-const { fetchArtistData, getAuth } = require("./fetchDjData.js");
+const { fetchArtistData } = require("./fetchDjData.js");
 const Artist = require("../models").artist;
 const Genre = require("../models").genre;
 const Event = require("../models").event;
@@ -32,7 +32,6 @@ function sleep(ms) {
 //runCheck();
 
 const createEvents = async () => {
-  const token = await getAuth();
   const fetchedEventData = async () => {
     return await Promise.all(
       allEvents.map(async (event) => {
@@ -40,9 +39,8 @@ const createEvents = async () => {
 
         const fetchedArtists = await Promise.all(
           eventArtists.map(async (artist) => {
-            const fetchedData = await fetchArtistData(token, artist);
+            const fetchedData = await fetchArtistData("token", artist);
 
-            console.log(fetchedData);
             if (fetchedData !== null) {
               return fetchedData;
             }
@@ -74,62 +72,123 @@ const createEvents = async () => {
   //   });
 
   //console.log("promise data", promisedData[0].artists);
-  console.log(promisedData);
 
-  promisedData.forEach(async (item) => {
-    const event = await Event.create({
-      name: item.name,
-      date: item.date,
-      location: item.location,
-      eventUrl: item.eventUrl,
-      imageUrl: item.imageUrl,
+  // console.log(promisedData);
+
+  //   data = data.filter(function( element ) {
+  //     return element !== undefined;
+  //  });
+
+  const trimmedData = promisedData.map((event) => {
+    const artists = event.artists.filter(function (element) {
+      return element !== undefined;
     });
-    if (item.artists.length !== 0) {
-      const newArtistArray = [...item.artists];
-      newArtistArray.forEach(async (artist) => {
-        if (artist !== undefined) {
-          const checkArtist = await Artist.findOne({
-            where: { spotifyArtistId: artist.id },
+
+    const trimmedArtists = artists.map((artist) => {
+      const trimmedGenres = artist.genres.filter(function (el) {
+        return el !== undefined;
+      });
+      return {
+        id: artist.id,
+        name: artist.name,
+        genres: [...trimmedGenres],
+      };
+    });
+
+    // const artists = event.artists.map((artist) => {
+    //   if (artist !== undefined) {
+    //     console.log(" not undefined artist", artist);
+    //     const genres = artist.genres.map((genre) => {
+    //       if (genre !== undefined) {
+    //         return genre;
+    //       }
+    //     });
+    //     return {
+    //       id: artist.id,
+    //       name: artist.name,
+    //       genres: [...genres],
+    //     };
+    //   }
+    // });
+    return {
+      date: event.date,
+      name: event.name,
+      location: event.location,
+      eventUrl: event.eventUrl,
+      imageUrl: event.imageUrl,
+      artists: [...trimmedArtists],
+    };
+  });
+  for (let z = 0; z < trimmedData.length; z++) {
+    const event = await Event.create({
+      name: trimmedData[z].name,
+      date: trimmedData[z].date,
+      location: trimmedData[z].location,
+      eventUrl: trimmedData[z].eventUrl,
+      imageUrl: trimmedData[z].imageUrl,
+    });
+    if (trimmedData[z].artists.length !== 0) {
+      const newArtistArray = [...trimmedData[z].artists];
+
+      for (let i = 0; i < newArtistArray.length; i++) {
+        const checkArtist = await Artist.findOne({
+          where: { spotifyArtistId: newArtistArray[i].id },
+        });
+        if (checkArtist !== null) {
+          await event.addArtist(checkArtist, { through: Event_Artist });
+        } else {
+          const newArtist = await Artist.create({
+            name: newArtistArray[i].name,
+            spotifyArtistId: newArtistArray[i].id,
           });
-          if (checkArtist !== null) {
-            await event.addArtist(checkArtist, { through: Event_Artist });
-          } else {
-            const newArtist = await Artist.create({
-              name: artist.name,
-              spotifyArtistId: artist.id,
-            });
 
-            await event.addArtist(newArtist, { through: Event_Artist });
-            if (artist.genres.length !== 0) {
-              const newGenreArray = [...artist.genres];
-              newGenreArray.forEach(async (genre) => {
-                if (genre !== undefined) {
-                  const checkGenre = await Genre.findOne({
-                    where: { name: genre },
-                  });
-                  if (checkGenre !== null) {
-                    console.log("My-Artist:", artist);
-                    await artist.addGenre(checkGenre, {
-                      through: Artist_Genre,
-                    });
-                  } else {
-                    console.log("My-Artist:2", artist);
+          await event.addArtist(newArtist, { through: Event_Artist });
 
-                    const newGenre = await Genre.create({
-                      name: genre,
-                    });
-                    await newArtist.addGenre(newGenre, {
-                      through: Artist_Genre,
-                    });
-                  }
-                }
+          if (newArtistArray[i].genres.length !== 0) {
+            const newGenreArray = [...newArtistArray[i].genres];
+
+            for (let j = 0; j < newGenreArray.length; j++) {
+              const checkGenre = await Genre.findOne({
+                where: { name: newGenreArray[j] },
               });
+              if (checkGenre !== null) {
+                await newArtist.addGenre(checkGenre, {
+                  through: Artist_Genre,
+                });
+              } else {
+                const newGenre = await Genre.create({
+                  name: newGenreArray[j],
+                });
+                await newArtist.addGenre(newGenre, {
+                  through: Artist_Genre,
+                });
+              }
             }
+            // newGenreArray.forEach(async (genre) => {
+            //   const checkGenre = await Genre.findOne({
+            //     where: { name: genre },
+            //   });
+            //   if (checkGenre !== null) {
+            //     console.log("My-Artist:", artist);
+            //     await newArtist.addGenre(checkGenre, {
+            //       through: Artist_Genre,
+            //     });
+            //   } else {
+            //     console.log("My-Artist:2", artist);
+
+            //     const newGenre = await Genre.create({
+            //       name: genre,
+            //     });
+            //     await newArtist.addGenre(newGenre, {
+            //       through: Artist_Genre,
+            //     });
+            //   }
+            // });
           }
         }
-      });
+      }
     }
-  });
+  }
 };
 // const ddd = async () => {
 //   await Event.create({

@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const AuthRoutes = require("./routers/auth");
+const UserRoutes = require("./routers/user");
 
 //const SpotifyAuthRouter = require("./scripts/getDjData.js");
 
@@ -12,6 +13,7 @@ application.use(express.urlencoded({ extended: true }));
 application.use(cors());
 
 application.use("/api", cors(), AuthRoutes);
+application.use("/user", cors(), UserRoutes);
 
 application.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);

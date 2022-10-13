@@ -1,6 +1,11 @@
 const User = require("../models").user;
 const { toData } = require("./jwt");
+const SpotifyWebApi = require("spotify-web-api-node");
+require("dotenv").config();
 
+const REDIRECTURI = process.env.REDIRECTURI;
+const CLIENTID = process.env.CLIENT_ID;
+const CLIENTSECRET = process.env.CLIENT_SECRET;
 async function auth(req, res, next) {
   const auth =
     req.headers.authorization && req.headers.authorization.split(" ");
@@ -18,6 +23,17 @@ async function auth(req, res, next) {
     if (!user) {
       return res.status(404).send({ message: "User does not exist" });
     }
+    const spotifyApi = new SpotifyWebApi();
+
+    spotifyApi.setCredentials({
+      accessToken: user.spotifyToken,
+      refreshToken: user.spotifyRefreshToken,
+      redirectUri: REDIRECTURI,
+      "clientId ": CLIENTID,
+      clientSecret: CLIENTSECRET,
+    });
+
+    req.spotifyApi = spotifyApi;
 
     // add user object to request
     req.user = user;

@@ -3,60 +3,171 @@ const authMiddleware = require("../auth/middleware");
 const User = require("../models").user;
 const Playlist = require("../models").playlist;
 const Artist = require("../models").artist;
-require("dotenv").config();
+const Playlist_Artist = require("../models").playlist_artist;
+const Genre = require("../models").genre;
+const Artist_Genre = require("../models").artist_genre;
 
-const REDIRECTURI = process.env.REDIRECTURI;
-const CLIENTID = process.env.CLIENT_ID;
-const CLIENTSECRET = process.env.CLIENT_SECRET;
+const router = new Router();
+router.get("/playlist", authMiddleware, async (req, res, next) => {
+  try {
+    const spotifyApi = req.spotifyApi;
 
-const SpotifyWebApi = require("spotify-web-api-node");
-// const router = new Router();
-// router.get("/playlist", authMiddleware, async (req, res, next) => {
-//   try {
-//     const user = req.user;
-//     const spotifyApi = new SpotifyWebApi();
+    spotifyApi.getUserPlaylists().then(
+      function (data) {
+        const playLists = data.body.items.map((playlist) => {
+          return { spotifyPlaylistId: playlist.id, name: playlist.name };
+        });
+        res.json(playLists);
+      },
+      function (err) {
+        console.log("Something went wrong!", err);
+      }
+    );
+  } catch (error) {
+    console.log(error);
+    return res.status(400).send({ message: "Something went wrong, sorry" });
+  }
+});
+router.post("/playlist", authMiddleware, async (req, res, next) => {
+  try {
+    const spotifyApi = req.spotifyApi;
+    const playlists = req.body;
+    const user = req.user;
 
-//     spotifyApi.setCredentials({
-//       accessToken: user.spotifyToken,
-//       refreshToken: user.spotifyRefreshToken,
-//       redirectUri: REDIRECTURI,
-//       "clientId ": CLIENTID,
-//       clientSecret: CLIENTSECRET,
-//     });
-//     spotifyApi.getUserPlaylists().then(
-//       function (data) {
-//         console.log("Retrieved playlists", data.body);
-//       },
-//       function (err) {
-//         console.log("Something went wrong!", err);
-//       }
-//     );
-//   } catch (error) {
-//     console.log(error);
-//     return res.status(400).send({ message: "Something went wrong, sorry" });
-//   }
-// });
-// module.exports = router;
+    const playlistWithArtists = await Promise.all(
+      playlists.map(async (playlist) => {
+        const promisedArtists = spotifyApi
+          .getPlaylist(playlist.id)
+          .then(function (data) {
+            const items = data.body.tracks.items;
+            const artists = items.map((item) => {
+              const artistArray = item.track.artists;
+              const trimmedArtists = artistArray.map((artistItem) => {
+                return {
+                  spotifyArtistId: artistItem.id,
+                  name: artistItem.name,
+                };
+              });
+              return trimmedArtists[0];
+            });
+            return {
+              spotifyPlaylistId: playlist.id,
+              name: playlist.name,
+              artists: artists,
+            };
+          });
 
-const deneme = () => {
-  const spotifyApi = new SpotifyWebApi();
+        return promisedArtists;
+      })
+    );
 
-  spotifyApi.setCredentials({
-    accessToken:
-      "BQBsmIZYwazARCqGgUHr3aue3FGWDjG8pHRYhMa6c0tVsZSLR4q9odeNmsrJdGiAXwIca1WQB0tV_Q5Fc2lDZmlbkKiGmN8aoth9-2w2s9GWedJ1HvfEt2MeAO1A_DkUR6Aarja856O2gklhAbGXY8c2VBKI0IIKPBQQAnpd6cu7fuDrMyIiVY2W_QycfRg3Kg",
-    refreshToken:
-      "AQAH9N1ZkY-7Nmv7p7fj_5P9ZhtowAI3-wiDcHVZuYwYScsyLR1ZNrj6FmuaLW9FSwbuSjut0IfseYqWkvyf2R5VlCPuc9g32_cWn0UwgYCfcvwjbf46epF-LisqmAgQ4BA",
-    redirectUri: REDIRECTURI,
-    "clientId ": CLIENTID,
-    clientSecret: CLIENTSECRET,
-  });
-  spotifyApi.getUserPlaylists().then(
-    function (data) {
-      console.log("Retrieved playlists", data.body);
-    },
-    function (err) {
-      console.log("Something went wrong!", err);
+    const removeDuplicates = playlistWithArtists.map((playlist) => {
+      const arr = [...playlist.artists];
+      const uniqueIds = new Set();
+
+      const unique = arr.filter((element) => {
+        const isDuplicate = uniqueIds.has(element.spotifyArtistId);
+
+        uniqueIds.add(element.spotifyArtistId);
+
+        if (!isDuplicate) {
+          return true;
+        }
+
+        return false;
+      });
+
+      return {
+        spotifyPlaylistId: playlist.spotifyPlaylistId,
+        name: playlist.name,
+        artists: unique,
+      };
+    });
+    const playlistArtistWithGenre = await Promise.all(
+      removeDuplicates.map(async (playlist) => {
+        const artistIds = playlist.artists.map(
+          (artist) => artist.spotifyArtistId
+        );
+
+        const artistsWithGenre = await spotifyApi
+          .getArtists(artistIds)
+          .then((data) => {
+            return data.body.artists.map((artist) => {
+              return {
+                spotifyArtistId: artist.id,
+                name: artist.name,
+                genres: artist.genres,
+              };
+            });
+          });
+        return {
+          spotifyPlaylistId: playlist.spotifyPlaylistId,
+          name: playlist.name,
+          artists: artistsWithGenre,
+        };
+      })
+    );
+    for (let i = 0; i < playlistArtistWithGenre.length; i++) {
+      const createdPlaylist = await Playlist.create({
+        spotifyPlaylistId: playlistArtistWithGenre[i].spotifyPlaylistId,
+        userId: user.id,
+        name: playlistArtistWithGenre[i].name,
+      });
+      for (let y = 0; y < playlistArtistWithGenre[i].artists.length; y++) {
+        const checkArtist = await Artist.findOne({
+          where: {
+            spotifyArtistId:
+              playlistArtistWithGenre[i].artists[y].spotifyArtistId,
+          },
+        });
+        if (checkArtist) {
+          await createdPlaylist.addArtist(checkArtist, {
+            through: Playlist_Artist,
+          });
+        } else {
+          const newArtist = await Artist.create({
+            name: playlistArtistWithGenre[i].artists[y].name,
+            spotifyArtistId:
+              playlistArtistWithGenre[i].artists[y].spotifyArtistId,
+          });
+          await createdPlaylist.addArtist(newArtist, {
+            through: Playlist_Artist,
+          });
+          if (playlistArtistWithGenre[i].artists[y].genres.length !== 0) {
+            for (
+              let z = 0;
+              z < playlistArtistWithGenre[i].artists[y].genres.length;
+              z++
+            ) {
+              await Genre.findOne({
+                where: {
+                  name: playlistArtistWithGenre[i].artists[y].genres[z],
+                },
+              }).then(async (genreData) => {
+                if (genreData) {
+                  await newArtist.addGenre(genreData, {
+                    through: Artist_Genre,
+                  });
+                } else {
+                  const newGenre = await Genre.create({
+                    name: playlistArtistWithGenre[i].artists[y].genres[z],
+                  });
+
+                  await newArtist.addGenre(newGenre, {
+                    through: Artist_Genre,
+                  });
+                }
+              });
+            }
+          }
+        }
+      }
     }
-  );
-};
-deneme();
+    return res.status(200).send({ message: "Playlists imported" });
+  } catch (error) {
+    console.log(error);
+    return res.status(400).send({ message: "Something went wrong, sorry" });
+  }
+});
+
+module.exports = router;

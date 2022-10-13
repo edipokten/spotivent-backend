@@ -42,12 +42,12 @@ router.get("/logged", async (req, res) => {
 
   // Retrieve an access token and a refresh token
   spotifyApi.authorizationCodeGrant(code).then(
-    function (data) {
-      console.log("access", data.body["access_token"]);
-      console.log("refresh", data.body["refresh_token"]);
+    function (authCodeData) {
+      console.log("access", authCodeData.body["access_token"]);
+      console.log("refresh", authCodeData.body["refresh_token"]);
 
-      spotifyApi.setAccessToken(data.body["access_token"]);
-      spotifyApi.setRefreshToken(data.body["refresh_token"]);
+      spotifyApi.setAccessToken(authCodeData.body["access_token"]);
+      spotifyApi.setRefreshToken(authCodeData.body["refresh_token"]);
       spotifyApi.getMe().then(
         async (data) => {
           const checkUser = await User.findOne({
@@ -55,18 +55,16 @@ router.get("/logged", async (req, res) => {
           });
           const getUserWithToken = async () => {
             if (checkUser) {
-              await User.update(
-                {
-                  spotifyUserId: data.body.id,
-                  spotifyToken: data.body.access_token,
-                  spotifyRefreshToken: data.body.refresh_token,
-                  image: data.body.images[0].url,
-                  name: data.body.display_name,
-                },
-                {
-                  where: { spotifyUserId: data.body.id },
-                }
-              );
+              checkUser.spotifyUserId = data.body.id;
+              checkUser.spotifyToken = authCodeData.body["access_token"];
+              checkUser.spotifyRefreshToken =
+                authCodeData.body["refresh_token"];
+              checkUser.image = data.body.images[0].url;
+              checkUser.name = data.body.display_name;
+              await checkUser.save();
+
+              console.log(checkUser);
+
               return {
                 spotifyUserId: data.body.id,
                 token: toJWT({ userId: checkUser.id }),
@@ -77,8 +75,8 @@ router.get("/logged", async (req, res) => {
             } else {
               const createdUser = await User.create({
                 spotifyUserId: data.body.id,
-                spotifyToken: data.body.access_token,
-                spotifyRefreshToken: data.body.refresh_token,
+                spotifyToken: authCodeData.body["access_token"],
+                spotifyRefreshToken: authCodeData.body["refresh_token"],
                 image: data.body.images[0].url,
                 name: data.body.display_name,
               });
