@@ -8,11 +8,12 @@ require("dotenv").config();
 const REDIRECTURI = process.env.REDIRECTURI;
 const CLIENTID = process.env.CLIENT_ID;
 const CLIENTSECRET = process.env.CLIENT_SECRET;
-
-require("dotenv").config();
+const EXPO_URL = process.env.EXPO_URL;
 
 router.get("/login", async (req, res) => {
   // check if you have a code for this user, if not get the code
+  const { redirect } = req.query;
+  console.log(redirect);
   const scopes = ["user-read-private", "user-read-email"],
     state = "some-state-of-my-choice";
 
@@ -26,7 +27,7 @@ router.get("/login", async (req, res) => {
   const authorizeURL = spotifyApi.createAuthorizeURL(scopes, state);
   console.log(authorizeURL);
 
-  res.redirect(authorizeURL);
+  res.send(authorizeURL);
 });
 router.get("/logged", async (req, res) => {
   const credentials = {
@@ -90,7 +91,10 @@ router.get("/logged", async (req, res) => {
             }
           };
           const user = await getUserWithToken();
-          res.json(user);
+          // res.json(user);
+          res.redirect(
+            `${EXPO_URL}?name=${user.name}&spotifyUserId=${user.spotifyUserId}&image=${user.image}&token=${user.token}`
+          );
         },
         function (err) {
           console.log("Something went wrong!", err);

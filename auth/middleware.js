@@ -7,6 +7,9 @@ const REDIRECTURI = process.env.REDIRECTURI;
 const CLIENTID = process.env.CLIENT_ID;
 const CLIENTSECRET = process.env.CLIENT_SECRET;
 async function auth(req, res, next) {
+  console.log("auth:", req.headers);
+  console.log("myBody", req.body);
+
   const auth =
     req.headers.authorization && req.headers.authorization.split(" ");
 

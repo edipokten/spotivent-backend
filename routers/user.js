@@ -28,20 +28,45 @@ router.get("/playlist", authMiddleware, async (req, res, next) => {
     return res.status(400).send({ message: "Something went wrong, sorry" });
   }
 });
+router.get("/profile", authMiddleware, async (req, res, next) => {
+  try {
+    const user = req.user;
+    const importedPlaylists = await Playlist.findAll({
+      where: { userId: user.id },
+    });
+    console.log(importedPlaylists);
+    const profile = {
+      spotifyUserId: user.spotifyUserId,
+      name: user.name,
+      image: user.image,
+      importedPlaylists: importedPlaylists,
+    };
+
+    res.status(200).send(profile);
+  } catch (error) {
+    console.log(error);
+    return res.status(400).send({ message: "Something went wrong, sorry" });
+  }
+});
+
 router.post("/playlist", authMiddleware, async (req, res, next) => {
   try {
     const spotifyApi = req.spotifyApi;
-    const playlists = req.body;
+    console.log("simge", req.body);
+    const playlists = req.body.playlists;
     const user = req.user;
 
     const playlistWithArtists = await Promise.all(
       playlists.map(async (playlist) => {
+        console.log("spplaylistId", playlist.spotifyPlaylistId);
         const promisedArtists = spotifyApi
-          .getPlaylist(playlist.id)
+          .getPlaylist(playlist.spotifyPlaylistId)
           .then(function (data) {
             const items = data.body.tracks.items;
+
             const artists = items.map((item) => {
               const artistArray = item.track.artists;
+
               const trimmedArtists = artistArray.map((artistItem) => {
                 return {
                   spotifyArtistId: artistItem.id,
@@ -50,8 +75,9 @@ router.post("/playlist", authMiddleware, async (req, res, next) => {
               });
               return trimmedArtists[0];
             });
+
             return {
-              spotifyPlaylistId: playlist.id,
+              spotifyPlaylistId: playlist.spotifyPlaylistId,
               name: playlist.name,
               artists: artists,
             };
@@ -107,12 +133,18 @@ router.post("/playlist", authMiddleware, async (req, res, next) => {
         };
       })
     );
+
     for (let i = 0; i < playlistArtistWithGenre.length; i++) {
-      const createdPlaylist = await Playlist.create({
-        spotifyPlaylistId: playlistArtistWithGenre[i].spotifyPlaylistId,
-        userId: user.id,
-        name: playlistArtistWithGenre[i].name,
+      const [createdOrFoundPlaylist, created] = await Playlist.findOrCreate({
+        where: {
+          spotifyPlaylistId: playlistArtistWithGenre[i].spotifyPlaylistId,
+          userId: user.id,
+        },
+        defaults: {
+          name: playlistArtistWithGenre[i].name,
+        },
       });
+
       for (let y = 0; y < playlistArtistWithGenre[i].artists.length; y++) {
         const checkArtist = await Artist.findOne({
           where: {
@@ -121,7 +153,7 @@ router.post("/playlist", authMiddleware, async (req, res, next) => {
           },
         });
         if (checkArtist) {
-          await createdPlaylist.addArtist(checkArtist, {
+          await createdOrFoundPlaylist.addArtist(checkArtist, {
             through: Playlist_Artist,
           });
         } else {
@@ -130,7 +162,7 @@ router.post("/playlist", authMiddleware, async (req, res, next) => {
             spotifyArtistId:
               playlistArtistWithGenre[i].artists[y].spotifyArtistId,
           });
-          await createdPlaylist.addArtist(newArtist, {
+          await createdOrFoundPlaylist.addArtist(newArtist, {
             through: Playlist_Artist,
           });
           if (playlistArtistWithGenre[i].artists[y].genres.length !== 0) {
