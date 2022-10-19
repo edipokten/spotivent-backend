@@ -6,7 +6,7 @@ const Artist = require("../models").artist;
 const Playlist_Artist = require("../models").playlist_artist;
 const Genre = require("../models").genre;
 const Artist_Genre = require("../models").artist_genre;
-
+const { matchedArtistsAndGenres } = require("../scripts/getMatchedEvent");
 const router = new Router();
 router.get("/playlist", authMiddleware, async (req, res, next) => {
   try {
@@ -202,4 +202,43 @@ router.post("/playlist", authMiddleware, async (req, res, next) => {
   }
 });
 
+router.get("/event", authMiddleware, async (req, res, next) => {
+  try {
+    const startDate = req.query.startDate;
+    const finishtDate = req.query.finishDate;
+
+    const userId = req.user.id;
+    console.log("myUserId:", userId);
+    console.log("myStartDate:", startDate);
+    console.log("myEndDate:", finishtDate);
+
+    const events = await matchedArtistsAndGenres(
+      startDate,
+      finishtDate,
+      userId
+    );
+
+    const addToValues = events.map((event) => {
+      return {
+        id: event.id,
+        name: event.name,
+        date: event.date,
+        location: event.location,
+        eventUrl: event.eventUrl,
+        imageUrl: event.imageUrl,
+        city: event.city,
+        artists: [...event.artists],
+        mutualGenres: event.mutualGenres ? event.mutualGenres : [],
+        mutualArtists: event.mutualArtists ? event.mutualArtists : [],
+      };
+    });
+
+    console.log("new array of events", addToValues[0].artists);
+
+    res.status(200).send(addToValues);
+  } catch (error) {
+    console.log(error);
+    return res.status(400).send({ message: "Something went wrong, sorry" });
+  }
+});
 module.exports = router;
